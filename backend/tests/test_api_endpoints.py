@@ -669,3 +669,138 @@ def test_inventory_update_idempotency():
         assert res.json()["client_operation_id"] == op_id
         assert "cached" in res.json()["message"]
 
+
+def test_idempotency_payload_mismatch_conflict():
+    """POST /inventory/update returns HTTP 409 Conflict if operation UUID is reused with different parameters."""
+    op_id = "op-conflict-uuid-123"
+    stored = {
+        "status": "success",
+        "message": "Stock logged",
+        "client_operation_id": op_id,
+        "_request": {
+            "phc_id": "PHC-001",
+            "medicine_name": "Paracetamol 500mg",
+            "quantity": 50,
+        },
+    }
+
+    with patch("app.db.fetch_one", return_value={"operation_id": op_id, "phc_id": "PHC-001", "response_payload": json.dumps(stored)}):
+        payload_conflicting = {
+            "phc_id": "PHC-001",
+            "medicine_name": "Paracetamol 500mg",
+            "quantity": 200,  # Contradicts stored 50
+            "timestamp": "2026-10-12T10:00:00Z",
+            "client_operation_id": op_id,
+        }
+        res = client.post("/api/v1/inventory/update", json=payload_conflicting)
+        assert res.status_code == 409
+        assert "conflict" in res.json()["detail"].lower()
+
+
+def test_stock_movement_payload_mismatch_conflict():
+    """POST /stock-movements returns HTTP 409 Conflict if same operation ID is submitted with different payload."""
+    op_id = "op-mov-conflict-456"
+    stored = {
+        "client_operation_id": op_id,
+        "status": "synced",
+        "message": "Recorded",
+        "current_usable_stock": 100,
+        "_request": {
+            "phc_id": "PHC-001",
+            "item_id": 1,
+            "batch_number": "BATCH-01",
+            "movement_type": "dispensed",
+            "quantity": 10,
+        },
+    }
+
+    with patch("app.db.fetch_one", return_value={"operation_id": op_id, "phc_id": "PHC-001", "response_payload": json.dumps(stored)}):
+        conflicting_movement = {
+            "client_operation_id": op_id,
+            "phc_id": "PHC-001",
+            "item_id": 1,
+            "batch_number": "BATCH-01",
+            "movement_type": "received",  # Differs from dispensed
+            "quantity": 50,
+        }
+        res = client.post("/api/v1/stock-movements", json=conflicting_movement)
+        assert res.status_code == 409
+        assert "conflict" in res.json()["detail"].lower()
+
+
+def test_user_management_role_enforcement():
+    """GET /users/ and POST /users/ reject unauthenticated or non-admin users with 401/403."""
+    # 1. Unauthenticated GET /users/
+    res_unauth = client.get("/api/v1/users/")
+    assert res_unauth.status_code in (401, 403)
+
+    # 2. Authenticated as regular viewer
+    from app.domain.auth import create_access_token
+    viewer_token = create_access_token(user_id=10, username="guest", email="guest@phc.local", role="viewer")
+    viewer_headers = {"Authorization": f"Bearer {viewer_token}"}
+    res_forbidden = client.get("/api/v1/users/", headers=viewer_headers)
+    assert res_forbidden.status_code == 403
+    assert "forbidden" in res_forbidden.json()["detail"].lower()
+
+
+def test_inventory_mutations_require_roles():
+    """POST /inventory/ and DELETE /inventory/{id} reject viewers with 403 Forbidden."""
+    from app.domain.auth import create_access_token
+    viewer_token = create_access_token(user_id=10, username="guest", email="guest@phc.local", role="viewer")
+    viewer_headers = {"Authorization": f"Bearer {viewer_token}"}
+
+    item_payload = {
+        "name": "Unauthorized Amoxicillin",
+        "category": "Antibiotic",
+        "quantity": 100,
+        "unit": "capsules",
+        "reorder_level": 50,
+    }
+    res_create = client.post("/api/v1/inventory/", json=item_payload, headers=viewer_headers)
+    assert res_create.status_code == 403
+
+    res_del = client.delete("/api/v1/inventory/99", headers=viewer_headers)
+    assert res_del.status_code == 403
+
+
+def test_alert_explanation_deterministic_fallback():
+    """GET /alerts/{alert_id}/explanation returns structured narrative with deterministic fallback."""
+    fake_alert = {
+        "alert_id": "alert-PHC-001-1-shortage",
+        "phc_id": "PHC-001",
+        "facility_name": "Kengeri PHC",
+        "district": "Bengaluru South",
+        "item_id": 1,
+        "item_name": "Paracetamol 500mg",
+        "unit": "tablets",
+        "type": "shortage",
+        "severity": "critical",
+        "current_stock": 10,
+        "usable_stock": 10,
+        "reserved_stock": 0,
+        "reorder_level": 50,
+        "safety_reserve": 50,
+        "message": "Stock is critically low.",
+        "status": "open",
+        "data_source": "database",
+        "generated_at": "2026-10-13T00:00:00Z",
+    }
+
+    with patch("app.routes.alerts.get_alert") as mock_get_alert, patch("app.routes.alerts.get_alert_donor_candidates", return_value=[]):
+        from app.models.schemas import AlertResponse
+        mock_get_alert.return_value = AlertResponse(**fake_alert)
+
+        res = client.get("/api/v1/alerts/alert-PHC-001-1-shortage/explanation")
+        assert res.status_code == 200
+        body = res.json()
+        assert body["alert_id"] == "alert-PHC-001-1-shortage"
+        assert body["facility_name"] == "Kengeri PHC"
+        assert body["is_ai_generated"] is False
+        assert body["model_version"] == "deterministic-rule-v1"
+        assert "evidence_fields" in body
+        assert body["evidence_fields"]["current_usable_stock"] == 10
+        assert "data_limitations" in body
+        assert len(body["data_limitations"]) > 0
+        assert "recommended_action" in body
+
+

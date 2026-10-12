@@ -37,17 +37,14 @@ class Settings(BaseModel):
 
     app_name: str = os.getenv("APP_NAME", "Healthcare Supply Chain API")
     app_version: str = os.getenv("APP_VERSION", "0.1.0")
-    debug: bool = os.getenv("DEBUG", "true").lower() in ("true", "1", "yes")
+    environment: str = os.getenv("ENVIRONMENT", "development").lower()
+    debug: bool = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
 
-    # CORS — allow the frontend dev server by default
+    # CORS — allow the configured origins
     cors_origins: list[str] = _parse_cors_origins()
 
-    # Database connection URL
-    database_url: str = os.getenv(
-        "DATABASE_URL",
-        "postgresql://postgres.podedwtxajduajsjqzar:orv%26nj0yer%21"
-        "@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres?sslmode=require",
-    ).strip()
+    # Database connection URL (No hardcoded credentials; defaults to empty)
+    database_url: str = os.getenv("DATABASE_URL", "").strip()
 
     # JWT Authentication
     jwt_secret_key: str = os.getenv("JWT_SECRET_KEY", "smarthealth-sentinel-dev-secret-key-32chars-min")
@@ -57,6 +54,21 @@ class Settings(BaseModel):
     # Supply Chain Policy Defaults
     planning_horizon_days: int = int(os.getenv("PLANNING_HORIZON_DAYS", "30"))
     default_safety_reserve_days: int = int(os.getenv("SAFETY_RESERVE_DAYS", "7"))
+
+    # Optional AI Explainer configuration (modular, non-authoritative)
+    gemini_api_key: str | None = os.getenv("GEMINI_API_KEY")
+
+    def model_post_init(self, __context):
+        # Production safeguard: fail fast if critical secrets are missing or defaults
+        if self.environment == "production":
+            if not self.database_url:
+                raise RuntimeError(
+                    "Security / Startup Error: DATABASE_URL must be configured when ENVIRONMENT=production."
+                )
+            if self.jwt_secret_key == "smarthealth-sentinel-dev-secret-key-32chars-min":
+                raise RuntimeError(
+                    "Security / Startup Error: JWT_SECRET_KEY must be overridden with a strong secret in production."
+                )
 
 
 settings = Settings()

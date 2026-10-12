@@ -40,9 +40,29 @@ async def record_stock_movement(payload: StockMovementRequest):
             (op_id,),
         )
         if cached:
-            logger.info("Idempotent replay detected for operation %s", op_id)
             cached_data = json.loads(cached["response_payload"])
-            return StockMovementResponse(**cached_data)
+            if cached.get("phc_id") and cached.get("phc_id") != payload.phc_id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Idempotency conflict: Operation '{op_id}' was already executed for facility '{cached['phc_id']}'.",
+                )
+            if "_request" in cached_data:
+                req = cached_data["_request"]
+                if (
+                    req.get("phc_id") != payload.phc_id
+                    or req.get("item_id") != payload.item_id
+                    or req.get("movement_type") != payload.movement_type.lower()
+                    or req.get("quantity") != payload.quantity
+                ):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=f"Idempotency conflict: Operation '{op_id}' was already executed with different payload parameters.",
+                    )
+            logger.info("Idempotent replay detected for operation %s", op_id)
+            cached_resp = {k: v for k, v in cached_data.items() if k != "_request"}
+            return StockMovementResponse(**cached_resp)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.warning("Error checking idempotency table: %s", e)
 
@@ -85,6 +105,25 @@ async def record_stock_movement(payload: StockMovementRequest):
 
     now = datetime.now(timezone.utc)
     txn_id = str(uuid.uuid4())
+
+    response = StockMovementResponse(
+        client_operation_id=op_id,
+        status="synced",
+        message=f"Stock movement '{m_type}' recorded successfully.",
+        current_usable_stock=new_qty,
+        acknowledged_at=now,
+    )
+
+    stored_payload = {
+        **response.model_dump(),
+        "_request": {
+            "phc_id": payload.phc_id,
+            "item_id": payload.item_id,
+            "batch_number": payload.batch_number,
+            "movement_type": m_type,
+            "quantity": qty,
+        },
+    }
 
     statements = [
         # UPSERT inventory
@@ -139,28 +178,8 @@ async def record_stock_movement(payload: StockMovementRequest):
                 now,
             ),
         ),
-    ]
-
-    try:
-        db.execute_transaction(statements)
-    except Exception as e:
-        logger.error("Failed to execute stock movement transaction: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database transaction error during stock movement.",
-        )
-
-    response = StockMovementResponse(
-        client_operation_id=op_id,
-        status="synced",
-        message=f"Stock movement '{m_type}' recorded successfully.",
-        current_usable_stock=new_qty,
-        acknowledged_at=now,
-    )
-
-    # Persist in processed_operations ledger for idempotency
-    try:
-        db.execute_query(
+        # Atomic idempotency ledger recording
+        (
             """
             INSERT INTO processed_operations (
                 operation_id, endpoint, phc_id, status_code, response_payload, created_at
@@ -172,11 +191,19 @@ async def record_stock_movement(payload: StockMovementRequest):
                 "/api/v1/stock-movements",
                 payload.phc_id,
                 200,
-                json.dumps(response.model_dump(), default=str),
+                json.dumps(stored_payload, default=str),
                 now,
             ),
-        )
+        ),
+    ]
+
+    try:
+        db.execute_transaction(statements)
     except Exception as e:
-        logger.warning("Failed to store idempotency record: %s", e)
+        logger.error("Failed to execute stock movement transaction: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database transaction error during stock movement.",
+        )
 
     return response

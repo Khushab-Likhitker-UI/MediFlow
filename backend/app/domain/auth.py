@@ -89,19 +89,6 @@ def get_current_user(
         )
 
     token = credentials.credentials
-    # Support backward-compatibility with legacy mock token during phased rollout if in debug
-    if token.startswith("jwt-supabase-") and settings.debug:
-        parts = token.split("-")
-        role = parts[-1] if len(parts) >= 4 else "viewer"
-        uid = int(parts[2]) if len(parts) >= 3 and parts[2].isdigit() else 1
-        return {
-            "user_id": uid,
-            "username": f"user_{uid}",
-            "email": f"user_{uid}@smarthealth.local",
-            "role": role,
-            "district": None,
-        }
-
     return decode_access_token(token)
 
 

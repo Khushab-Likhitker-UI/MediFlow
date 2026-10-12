@@ -253,3 +253,29 @@ async def get_alert_donor_candidates(alert_id: str):
 
     return formatted
 
+
+@router.get(
+    "/{alert_id}/explanation",
+    summary="Get explainable grounded narrative for an alert with deterministic fallback",
+)
+async def get_alert_explanation(alert_id: str):
+    """
+    Produce a structured explanation for a shortage alert.
+    Grounded in calculated numbers, with deterministic offline template fallback.
+    """
+    from app.domain.explainer import explain_alert
+
+    alert = await get_alert(alert_id)
+    alert_dict = alert.model_dump()
+
+    # Retrieve candidate donor context if available
+    try:
+        donors = await get_alert_donor_candidates(alert_id)
+    except Exception as e:
+        logger.warning("Could not fetch candidate donors for explanation: %s", e)
+        donors = []
+
+    explanation = explain_alert(alert_dict, donors)
+    return explanation
+
+

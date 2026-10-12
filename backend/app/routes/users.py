@@ -35,7 +35,7 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-from app.domain.auth import create_access_token, get_current_user
+from app.domain.auth import create_access_token, get_current_user, require_roles
 from app.core.config import settings
 
 @router.post("/login", summary="Verify user credentials and issue signed JWT")
@@ -90,8 +90,8 @@ async def get_current_user_profile(current_user: dict = Depends(get_current_user
 
 
 @router.get("/", response_model=list[User], summary="List all users")
-async def list_users():
-    """Return all users.  Password hashes are never included."""
+async def list_users(current_user: dict = Depends(require_roles(["admin"]))):
+    """Return all users. Password hashes are never included. Restricted to admin role."""
     try:
         query = "SELECT id, username, email, role, is_active FROM users ORDER BY id"
         return db.fetch_all(query)
@@ -101,8 +101,11 @@ async def list_users():
 
 
 @router.get("/{user_id}", response_model=User, summary="Get user by ID")
-async def get_user(user_id: int):
-    """Fetch a single user by ID.  Password hash is never returned."""
+async def get_user(user_id: int, current_user: dict = Depends(get_current_user)):
+    """Fetch a single user by ID. Only accessible to administrators or the user themselves."""
+    if current_user.get("role") != "admin" and int(current_user.get("user_id", -1)) != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden: Insufficient permissions to view this user profile.")
+
     try:
         query = "SELECT id, username, email, role, is_active FROM users WHERE id = %s"
         user = db.fetch_one(query, (user_id,))
@@ -116,13 +119,11 @@ async def get_user(user_id: int):
 
 
 @router.post("/", response_model=User, status_code=201, summary="Register a new user")
-async def create_user(user_in: UserCreate):
-    """Register a new user.
-
-    - Hashes the password with bcrypt before INSERT.
-    - Returns 400 if email is already registered.
-    - Never returns the password hash in the response.
-    """
+async def create_user(
+    user_in: UserCreate,
+    current_user: dict = Depends(require_roles(["admin"])),
+):
+    """Register a new user. Restricted to administrators."""
     hashed_password = get_password_hash(user_in.password)
     query = """
     INSERT INTO users (username, email, role, password_hash)

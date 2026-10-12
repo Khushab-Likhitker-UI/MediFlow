@@ -29,13 +29,13 @@ def get_pool():
             db_url = db_url.strip()
 
         if not db_url:
-            db_url = (
-                "postgresql://postgres.podedwtxajduajsjqzar:orv%26nj0yer%21"
-                "@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres"
+            raise ValueError(
+                "DATABASE_URL not found in environment. "
+                "Please configure DATABASE_URL in your .env or environment variables."
             )
 
-        # Supabase requires SSL — ensure sslmode is set
-        if "sslmode" not in db_url:
+        # Append sslmode if not localhost and sslmode not set
+        if "sslmode" not in db_url and "localhost" not in db_url and "127.0.0.1" not in db_url:
             separator = "&" if "?" in db_url else "?"
             db_url += f"{separator}sslmode=require"
 

@@ -373,8 +373,10 @@ def get_pool():
         if db_url:
             db_url = db_url.strip()
 
-        # If user explicitly wants sqlite or no valid remote pg configured
-        if not db_url or "aws-0-ap-northeast-1.pooler.supabase.com" in db_url:
+        is_prod = os.getenv("ENVIRONMENT", "").lower() == "production"
+        if not db_url:
+            if is_prod:
+                raise RuntimeError("Production Configuration Error: DATABASE_URL is required in production environment.")
             logger.info("Using embedded local SQLite storage (mediflow_local.db)")
             _use_sqlite = True
             _init_sqlite_engine()

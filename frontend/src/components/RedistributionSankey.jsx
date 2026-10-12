@@ -98,6 +98,13 @@ export const RedistributionSankey = ({ phcs }) => {
         </select>
       </div>
 
+      <div className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center justify-between">
+        <div>
+          <span className="font-bold tracking-wider uppercase mr-2">[Non-Authoritative Heuristic Preview]</span>
+          <span>Flow volumes represent advisory estimates. Authoritative donor surplus calculation and reservation holds are executed exclusively by the backend Transfer Engine during Coordinator Review.</span>
+        </div>
+      </div>
+
       {chartData.nodes.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-gray-400 font-light uppercase tracking-widest text-sm">No redistribution flows available for selected criteria.</div>

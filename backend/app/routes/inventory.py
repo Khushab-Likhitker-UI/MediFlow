@@ -21,8 +21,9 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
+from app.domain.auth import require_roles
 from app.models.schemas import SupplyItem, SupplyItemCreate, StockUpdate
 from app import db
 
@@ -136,7 +137,10 @@ async def get_item(item_id: int):
 
 
 @router.post("/", response_model=SupplyItem, status_code=201, summary="Add a new supply item")
-async def create_item(item_in: SupplyItemCreate):
+async def create_item(
+    item_in: SupplyItemCreate,
+    current_user: dict = Depends(require_roles(["admin", "manager"])),
+):
     """Add a new medicine to the catalogue.
 
     When ``quantity > 0``, an inventory row is also created atomically
@@ -262,7 +266,11 @@ async def create_item(item_in: SupplyItemCreate):
 
 
 @router.put("/{item_id}", response_model=SupplyItem, summary="Update a supply item")
-async def update_item(item_id: int, item_in: SupplyItemCreate):
+async def update_item(
+    item_id: int,
+    item_in: SupplyItemCreate,
+    current_user: dict = Depends(require_roles(["admin", "manager"])),
+):
     """Update the catalogue entry for an existing medicine."""
     update_query = """
     UPDATE medicines
@@ -316,7 +324,10 @@ async def update_item(item_id: int, item_in: SupplyItemCreate):
 
 
 @router.delete("/{item_id}", status_code=204, summary="Delete a supply item")
-async def delete_item(item_id: int):
+async def delete_item(
+    item_id: int,
+    current_user: dict = Depends(require_roles(["admin"])),
+):
     """Delete a medicine from the catalogue.
 
     Returns 400 if inventory records still reference the item.
@@ -366,18 +377,38 @@ async def update_stock(
     if client_op_id:
         try:
             check_op = db.fetch_one(
-                "SELECT operation_id, response_payload FROM processed_operations WHERE operation_id = %s",
+                "SELECT operation_id, phc_id, response_payload FROM processed_operations WHERE operation_id = %s",
                 (client_op_id,),
             )
             if check_op:
                 logger.info("Idempotent deduplication hit for operation %s", client_op_id)
                 if check_op.get("response_payload"):
-                    return json.loads(check_op["response_payload"])
+                    cached_dict = json.loads(check_op["response_payload"])
+                    if "_request" in cached_dict:
+                        req = cached_dict["_request"]
+                        if (
+                            req.get("phc_id") != update.phc_id
+                            or req.get("medicine_name") != update.medicine_name
+                            or req.get("quantity") != update.quantity
+                        ):
+                            raise HTTPException(
+                                status_code=409,
+                                detail=f"Idempotency conflict: Operation '{client_op_id}' was already executed with different payload parameters.",
+                            )
+                    elif check_op.get("phc_id") and check_op.get("phc_id") != update.phc_id:
+                        raise HTTPException(
+                            status_code=409,
+                            detail=f"Idempotency conflict: Operation '{client_op_id}' was already executed for facility '{check_op['phc_id']}'.",
+                        )
+                    clean_res = {k: v for k, v in cached_dict.items() if k != "_request"}
+                    return clean_res
                 return {
                     "status": "success",
                     "message": "Stock logged (cached idempotency ack)",
                     "client_operation_id": client_op_id,
                 }
+        except HTTPException:
+            raise
         except Exception as e:
             logger.warning("Idempotency check query failed: %s", e)
 
@@ -429,6 +460,20 @@ async def update_stock(
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     """
 
+    ack_data = {
+        "status": "success",
+        "message": "Stock logged",
+        "client_operation_id": client_op_id,
+    }
+    stored_payload = {
+        **ack_data,
+        "_request": {
+            "phc_id": update.phc_id,
+            "medicine_name": update.medicine_name,
+            "quantity": update.quantity,
+        },
+    }
+
     sync_id = client_op_id or str(uuid.uuid4())
     queries_params = [
         (
@@ -450,30 +495,24 @@ async def update_stock(
         ),
     ]
 
+    if client_op_id:
+        queries_params.append(
+            (
+                """
+                INSERT INTO processed_operations (
+                    operation_id, endpoint, operation_type, phc_id, status_code, response_payload, created_at
+                ) VALUES (%s, '/api/v1/inventory/update', 'inventory_update', %s, 200, %s, NOW())
+                ON CONFLICT (operation_id) DO NOTHING;
+                """,
+                (client_op_id, update.phc_id, json.dumps(stored_payload)),
+            )
+        )
+
     try:
         db.execute_transaction(queries_params)
     except Exception as e:
         logger.error("Failed to update stock: %s", e)
         raise _classify_db_error(e)
-
-    # 5. Record operation for exact-once deduplication
-    ack_data = {
-        "status": "success",
-        "message": "Stock logged",
-        "client_operation_id": client_op_id,
-    }
-    if client_op_id:
-        try:
-            db.execute_query(
-                """
-                INSERT INTO processed_operations (operation_id, endpoint, operation_type, phc_id, status_code, response_payload, created_at)
-                VALUES (%s, '/api/v1/inventory/update', 'inventory_update', %s, 200, %s, NOW())
-                ON CONFLICT (operation_id) DO NOTHING;
-                """,
-                (client_op_id, update.phc_id, json.dumps(ack_data)),
-            )
-        except Exception as e:
-            logger.warning("Failed to record processed_operation: %s", e)
 
     return ack_data
 

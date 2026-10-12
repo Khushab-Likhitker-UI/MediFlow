@@ -41,6 +41,13 @@ export const RedistributionView = ({ phcs }) => {
         </select>
       </div>
 
+      <div className="mb-6 p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center justify-between">
+        <div>
+          <span className="font-bold tracking-wider uppercase mr-2">[Non-Authoritative Heuristic Preview]</span>
+          <span>Displayed routing represents an advisory visualization. Authoritative donor eligibility, protected safety reserves, and atomic reservations are enforced strictly by the backend Transfer Engine during Coordinator Review.</span>
+        </div>
+      </div>
+
       {filteredTransfers.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-gray-400 font-light uppercase tracking-widest text-sm">No critical shortages require redistribution.</div>
