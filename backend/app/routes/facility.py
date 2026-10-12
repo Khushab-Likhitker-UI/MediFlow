@@ -59,9 +59,13 @@ async def list_facilities():
         beds = db.fetch_all("SELECT phc_id, available_beds FROM beds")
         # Get the latest attendance for each PHC (not just today)
         att = db.fetch_all("""
-            SELECT DISTINCT ON (phc_id) phc_id, doctors_present
-            FROM phc_attendance_summary
-            ORDER BY phc_id, attendance_date DESC
+            SELECT pas.phc_id, pas.doctors_present
+            FROM phc_attendance_summary pas
+            JOIN (
+                SELECT phc_id, MAX(attendance_date) AS max_date
+                FROM phc_attendance_summary
+                GROUP BY phc_id
+            ) latest ON pas.phc_id = latest.phc_id AND pas.attendance_date = latest.max_date
         """)
         # Compute actual avg daily consumption from medicine_consumption table
         consumption = db.fetch_all("""

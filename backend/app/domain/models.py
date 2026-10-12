@@ -42,6 +42,14 @@ class InventoryBatch:
     is_quarantined: bool = False
     is_damaged: bool = False
 
+    def __post_init__(self):
+        if isinstance(self.expiry_date, str):
+            try:
+                self.expiry_date = date.fromisoformat(self.expiry_date.split("T")[0])
+            except Exception:
+                from datetime import timedelta
+                self.expiry_date = date.today() + timedelta(days=365)
+
 
 @dataclass
 class UsableStockResult:

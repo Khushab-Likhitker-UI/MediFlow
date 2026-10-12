@@ -116,7 +116,14 @@ def calculate_usable_stock(
         qty = max(0, b.quantity)
         total_physical += qty
 
-        if b.expiry_date <= as_of_date:
+        exp = b.expiry_date
+        if isinstance(exp, str):
+            try:
+                exp = date.fromisoformat(exp.split("T")[0])
+            except Exception:
+                exp = as_of_date
+
+        if exp <= as_of_date:
             expired_qty += qty
         elif b.is_quarantined or b.is_damaged:
             quarantined_qty += qty
@@ -125,7 +132,7 @@ def calculate_usable_stock(
                 eligible_batches.append(b)
 
     # Sort eligible batches by expiry date (FEFO)
-    eligible_batches.sort(key=lambda b: b.expiry_date)
+    eligible_batches.sort(key=lambda b: (b.expiry_date if isinstance(b.expiry_date, date) else date.today()))
 
     unexpired_clean = total_physical - expired_qty - quarantined_qty
     reservations_applied = max(0, active_reservations)

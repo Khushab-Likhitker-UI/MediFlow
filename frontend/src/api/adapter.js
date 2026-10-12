@@ -38,18 +38,24 @@ export function setMockScenario(scenario) {
   currentMockScenario = scenario;
 }
 
+let currentMemoryApiMode = null;
+
 export function getApiMode() {
   if (IS_PROD) {
     return 'real';
   }
+  if (currentMemoryApiMode) {
+    return currentMemoryApiMode;
+  }
   const saved = typeof window !== 'undefined' ? sessionStorage.getItem(STORAGE_KEY) : null;
-  return saved || 'mock'; // Defaults to mock in development if not explicitly set
+  return saved || 'real'; // Defaults to live real backend
 }
 
 export function setApiMode(mode) {
   if (IS_PROD && mode === 'mock') {
     throw new Error('Security Violation: Mock mode is strictly forbidden in production builds.');
   }
+  currentMemoryApiMode = mode;
   if (typeof window !== 'undefined') {
     sessionStorage.setItem(STORAGE_KEY, mode);
   }

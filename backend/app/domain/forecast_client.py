@@ -136,5 +136,13 @@ def get_forecast_provider():
         from app.ml.provider import get_forecast_provider as get_ml_provider
         return get_ml_provider()
     except (ImportError, AttributeError):
-        return BaselineForecastProvider()
+        pass
+
+    try:
+        from app.ml.provider import SmartHealthForecastProvider
+        return SmartHealthForecastProvider()
+    except (ImportError, AttributeError, TypeError):
+        pass
+
+    return BaselineForecastProvider()
 

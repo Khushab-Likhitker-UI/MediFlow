@@ -9,7 +9,7 @@ import datetime as _dt
 from datetime import date as date_type, datetime, timezone
 from typing import List
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ── Inventory ────────────────────────────────────────────────────────────────
@@ -47,8 +47,7 @@ class SupplyItem(SupplyItemBase):
         default_factory=lambda: datetime.now(timezone.utc)
     )
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ── Users ────────────────────────────────────────────────────────────────────
@@ -104,8 +103,7 @@ class User(UserBase):
     id: int
     is_active: bool = True
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ── Predictions ──────────────────────────────────────────────────────────────

@@ -466,11 +466,11 @@ async def update_stock(
         try:
             db.execute_query(
                 """
-                INSERT INTO processed_operations (operation_id, operation_type, response_payload, created_at)
-                VALUES (%s, 'inventory_update', %s, NOW())
+                INSERT INTO processed_operations (operation_id, endpoint, operation_type, phc_id, status_code, response_payload, created_at)
+                VALUES (%s, '/api/v1/inventory/update', 'inventory_update', %s, 200, %s, NOW())
                 ON CONFLICT (operation_id) DO NOTHING;
                 """,
-                (client_op_id, json.dumps(ack_data)),
+                (client_op_id, update.phc_id, json.dumps(ack_data)),
             )
         except Exception as e:
             logger.warning("Failed to record processed_operation: %s", e)
