@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.routes import (
     alerts,
     evaluations,
+    explanations,
     facility,
     inventory,
     predictions,
@@ -27,6 +28,10 @@ from app.routes import (
 from app.routes.predictions import shortage_router
 
 from app.db import close_pool
+import time
+import uuid
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 
@@ -35,6 +40,38 @@ logging.basicConfig(
     format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+# ── Structured Logging & Request ID Middleware ──────────────────────────────
+
+class SafeStructuredLoggingMiddleware(BaseHTTPMiddleware):
+    """
+    Operational visibility middleware:
+    - Injects and propagates X-Request-ID for distributed trace correlation.
+    - Emits structured operational log entries with latency and status code.
+    - Explicitly safeguards privacy: NEVER logs request body, authorization
+      headers, secrets, or patient identifiable information.
+    """
+    async def dispatch(self, request: Request, call_next):
+        req_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+        request.state.request_id = req_id
+        start_time = time.perf_counter()
+
+        response = await call_next(request)
+        duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+
+        response.headers["x-request-id"] = req_id
+
+        # Safe operational logging (no PHI, no credentials)
+        logger.info(
+            "request_completed method=%s path=%s status=%s duration_ms=%.2f request_id=%s",
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
+            req_id,
+        )
+        return response
 
 
 # ── Lifespan ─────────────────────────────────────────────────────────────────
@@ -67,14 +104,16 @@ app = FastAPI(
         "Provides inventory CRUD, transfer state machine, shortage alerts, Prophet forecasting, "
         "and offline PWA synchronization."
     ),
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url="/docs" if settings.debug else None,
+    redoc_url="/redoc" if settings.debug else None,
     lifespan=lifespan,
 )
 
-# ── CORS Middleware ──────────────────────────────────────────────────────────
-# ADR-004: Restrict to explicit origins list from environment / config
+# ── Middleware ───────────────────────────────────────────────────────────────
 
+app.add_middleware(SafeStructuredLoggingMiddleware)
+
+# ADR-004: Restrict to explicit origins list from environment / config
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -94,11 +133,26 @@ app.include_router(alerts.router, prefix="/api/v1")
 app.include_router(stock_movements.router, prefix="/api/v1")
 app.include_router(evaluations.router, prefix="/api/v1")
 app.include_router(replenishment.router, prefix="/api/v1")
+app.include_router(explanations.router, prefix="/api/v1")
 app.include_router(shortage_router, prefix="/api")
 
 
+# ── Health Probes ────────────────────────────────────────────────────────────
 
-# ── Root health check ───────────────────────────────────────────────────────
+@app.get("/api/v1/health", tags=["Health"])
+@app.get("/health", tags=["Health"])
+async def api_health():
+    """Lightweight operational health probe for Cloud Run and uptime monitors.
+    
+    Exposes only high-level status; never exposes secrets, database URLs,
+    or internal topology diagnostics.
+    """
+    return {
+        "status": "healthy",
+        "service": settings.app_name,
+        "version": settings.app_version,
+    }
+
 
 @app.get("/", tags=["Health"])
 async def root():
@@ -106,13 +160,12 @@ async def root():
         "service": settings.app_name,
         "version": settings.app_version,
         "status": "running",
-        "docs": "/docs",
     }
 
 
 if __name__ == "__main__":
     import uvicorn
     import os
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 8080))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
 

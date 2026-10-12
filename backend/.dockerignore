@@ -1,0 +1,15 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.pytest_tmp
+tests/.pytest_tmp
+htmlcov/
+.coverage
+.env
+.env.*
+!.env.example
+.venv
+venv
+env

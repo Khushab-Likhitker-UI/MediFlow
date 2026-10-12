@@ -37,26 +37,31 @@ class Settings(BaseModel):
 
     app_name: str = os.getenv("APP_NAME", "Healthcare Supply Chain API")
     app_version: str = os.getenv("APP_VERSION", "0.1.0")
-    debug: bool = os.getenv("DEBUG", "true").lower() in ("true", "1", "yes")
+    # Deployed environments must have DEBUG=false
+    debug: bool = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
 
-    # CORS — allow the frontend dev server by default
+    # CORS — allow explicit origins from environment
     cors_origins: list[str] = _parse_cors_origins()
 
-    # Database connection URL
-    database_url: str = os.getenv(
-        "DATABASE_URL",
-        "postgresql://postgres.podedwtxajduajsjqzar:orv%26nj0yer%21"
-        "@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres?sslmode=require",
-    ).strip()
+    # Database connection URL (injected via Secret Manager or environment; no hardcoded credentials)
+    database_url: str = os.getenv("DATABASE_URL", "").strip()
 
     # JWT Authentication
-    jwt_secret_key: str = os.getenv("JWT_SECRET_KEY", "smarthealth-sentinel-dev-secret-key-32chars-min")
+    jwt_secret_key: str = os.getenv(
+        "JWT_SECRET_KEY",
+        "sentinel-insecure-dev-fallback-key-change-in-production-32chars",
+    )
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
     jwt_access_token_expire_minutes: int = int(os.getenv("JWT_EXPIRE_MINUTES", "1440"))
 
     # Supply Chain Policy Defaults
     planning_horizon_days: int = int(os.getenv("PLANNING_HORIZON_DAYS", "30"))
     default_safety_reserve_days: int = int(os.getenv("SAFETY_RESERVE_DAYS", "7"))
+
+    # Grounded Gemini / Vertex AI settings (server-side only; never expose to client)
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "").strip()
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
+    gemini_timeout_seconds: float = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "3.0"))
 
 
 settings = Settings()
