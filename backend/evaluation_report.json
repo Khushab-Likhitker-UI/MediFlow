@@ -1,7 +1,7 @@
 {
-  "evaluation_run_id": "eval-run-2151d864cdea",
+  "evaluation_run_id": "eval-run-6a2e2d4501bb",
   "scenario_set_version": "v1.0.0-phase1d",
-  "generated_at": "2026-10-12T22:31:43.315762+00:00",
+  "generated_at": "2026-10-13T03:36:51.986537+00:00",
   "data_provenance": "synthetic_scenario",
   "disclaimer": "Synthetic scenario evaluation validates algorithmic implementation under controlled boundary conditions; it does not prove real-world PHC impact.",
   "offline_sync_test_lane_note": "Offline exact-once deduplication is owned by PWA test suite (phc-app).",

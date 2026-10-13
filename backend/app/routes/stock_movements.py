@@ -94,7 +94,15 @@ async def record_stock_movement(payload: StockMovementRequest):
     if m_type in ("received", "transferred_in"):
         new_qty = current_qty + qty
     elif m_type in ("dispensed", "transferred_out", "expired"):
-        new_qty = max(0, current_qty - qty)
+        if current_qty < qty:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Insufficient inventory for {m_type}: facility '{payload.phc_id}' has {current_qty} "
+                    f"units of batch '{payload.batch_number}', but requested {qty} units."
+                ),
+            )
+        new_qty = current_qty - qty
     elif m_type == "adjusted":
         new_qty = qty
     else:
@@ -105,6 +113,20 @@ async def record_stock_movement(payload: StockMovementRequest):
 
     now = datetime.now(timezone.utc)
     txn_id = str(uuid.uuid4())
+
+    # Resolve batch expiry date from payload or existing batch record
+    expiry_to_use = payload.expiry_date
+    if not expiry_to_use:
+        existing_batch = db.fetch_one(
+            "SELECT expiry_date FROM inventory WHERE item_id = %s AND batch_number = %s LIMIT 1",
+            (payload.item_id, payload.batch_number),
+        )
+        if existing_batch and existing_batch.get("expiry_date"):
+            expiry_to_use = str(existing_batch["expiry_date"])
+        else:
+            # Fallback to 1 year only when batch is brand new and unstated
+            from datetime import timedelta
+            expiry_to_use = (now.date() + timedelta(days=365)).isoformat()
 
     response = StockMovementResponse(
         client_operation_id=op_id,
@@ -134,7 +156,7 @@ async def record_stock_movement(payload: StockMovementRequest):
                 expiry_date, timestamp, created_at, updated_at
             ) VALUES (
                 gen_random_uuid(), %s, %s, %s, %s,
-                CURRENT_DATE + INTERVAL '1 year', %s, %s, %s
+                %s, %s, %s, %s
             )
             ON CONFLICT (phc_id, item_id, batch_number)
             DO UPDATE SET
@@ -147,6 +169,7 @@ async def record_stock_movement(payload: StockMovementRequest):
                 payload.item_id,
                 payload.batch_number,
                 new_qty,
+                expiry_to_use,
                 payload.occurred_at,
                 now,
                 now,

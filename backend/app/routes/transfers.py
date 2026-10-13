@@ -475,13 +475,13 @@ async def dispatch_transfer(
     txn_id = str(uuid.uuid4())
 
     statements = [
-        # Deduct from donor inventory
+        # Deduct from donor inventory (conditional update ensuring non-negative stock)
         (
             """
             UPDATE inventory
-            SET quantity = GREATEST(0, quantity - %s),
+            SET quantity = quantity - %s,
                 updated_at = %s
-            WHERE phc_id = %s AND item_id = %s AND batch_number = %s;
+            WHERE phc_id = %s AND item_id = %s AND batch_number = %s AND quantity >= %s;
             """,
             (
                 transfer["quantity"],
@@ -489,9 +489,10 @@ async def dispatch_transfer(
                 transfer["from_phc_id"],
                 transfer["item_id"],
                 transfer["batch_number"],
+                transfer["quantity"],
             ),
         ),
-        # Fulfill reservation
+        # Fulfill reservation (ensuring reservation was active)
         (
             """
             UPDATE stock_reservations
@@ -581,9 +582,10 @@ async def receive_transfer(
     Receive transfer:
     1. Validates status is DISPATCHED.
     2. Adds accepted quantity to destination inventory row.
-    3. Logs 'transferred_in' in inventory_transactions.
-    4. Handles discrepancies (if received_quantity != dispatched_quantity).
-    5. Sets status to RECEIVED (or RECONCILED if exact match).
+    3. Preserves actual batch expiry from donor facility via subquery.
+    4. Logs 'transferred_in' in inventory_transactions.
+    5. Handles discrepancies (if received_quantity != dispatched_quantity).
+    6. Sets status to RECEIVED (or RECONCILED if exact match).
     """
     transfer = db.fetch_one("SELECT * FROM transfers WHERE transfer_id = %s", (transfer_id,))
     if not transfer:
@@ -605,7 +607,7 @@ async def receive_transfer(
     )
 
     statements = [
-        # UPSERT into destination facility inventory
+        # UPSERT into destination facility inventory preserving actual batch expiry date
         (
             """
             INSERT INTO inventory (
@@ -613,7 +615,12 @@ async def receive_transfer(
                 expiry_date, timestamp, created_at, updated_at
             ) VALUES (
                 gen_random_uuid(), %s, %s, %s, %s,
-                CURRENT_DATE + INTERVAL '1 year', %s, %s, %s
+                COALESCE(
+                    (SELECT expiry_date FROM inventory WHERE phc_id = %s AND item_id = %s AND batch_number = %s LIMIT 1),
+                    (SELECT expiry_date FROM inventory WHERE item_id = %s AND batch_number = %s LIMIT 1),
+                    CURRENT_DATE + INTERVAL '1 year'
+                ),
+                %s, %s, %s
             )
             ON CONFLICT (phc_id, item_id, batch_number)
             DO UPDATE SET
@@ -625,6 +632,11 @@ async def receive_transfer(
                 transfer["item_id"],
                 transfer["batch_number"],
                 received_qty,
+                transfer["from_phc_id"],
+                transfer["item_id"],
+                transfer["batch_number"],
+                transfer["item_id"],
+                transfer["batch_number"],
                 now,
                 now,
                 now,

@@ -323,6 +323,7 @@ class StockMovementRequest(BaseModel):
     )
     quantity: int = Field(..., gt=0, description="Quantity moved in base units")
     occurred_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    expiry_date: str | None = Field(default=None, description="ISO format YYYY-MM-DD batch expiry date")
     remarks: str | None = None
 
 
