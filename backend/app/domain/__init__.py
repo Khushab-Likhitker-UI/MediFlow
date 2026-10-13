@@ -43,6 +43,7 @@ from app.domain.auth import (
     get_current_user,
     require_roles,
     verify_district_access,
+    verify_facility_access,
 )
 
 __all__ = [
@@ -79,4 +80,5 @@ __all__ = [
     "get_current_user",
     "require_roles",
     "verify_district_access",
+    "verify_facility_access",
 ]

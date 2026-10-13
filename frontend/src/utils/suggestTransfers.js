@@ -1,3 +1,11 @@
+/**
+ * NON-AUTHORITATIVE PREVIEW ONLY.
+ * 
+ * This client-side helper is strictly for exploratory UI previews.
+ * All authoritative transfer quantities, donor safe surpluses, reserves,
+ * batch validations, and approvals are calculated and enforced by the backend API.
+ */
+
 import { getStockStatus, getStockHours } from './stockUtils';
 
 export const suggestTransfers = (phcs) => {

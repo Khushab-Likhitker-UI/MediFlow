@@ -363,6 +363,8 @@ def _init_sqlite_engine():
 def get_pool():
     """
     Initialise PostgreSQL connection pool or switch to SQLite fallback.
+    Silent fallback to SQLite is ONLY permitted in development / testing.
+    In production and staging, unreachable PostgreSQL fails safely with a RuntimeError.
     """
     global _pg_pool, _use_sqlite
     if _use_sqlite:
@@ -373,10 +375,13 @@ def get_pool():
         if db_url:
             db_url = db_url.strip()
 
-        is_prod = os.getenv("ENVIRONMENT", "").lower() == "production"
+        env = os.getenv("ENVIRONMENT", "").lower()
+        is_prod_or_staging = env in ("production", "staging")
         if not db_url:
-            if is_prod:
-                raise RuntimeError("Production Configuration Error: DATABASE_URL is required in production environment.")
+            if is_prod_or_staging:
+                raise RuntimeError(
+                    f"Production/Staging Configuration Error: DATABASE_URL is required in {env} environment."
+                )
             logger.info("Using embedded local SQLite storage (mediflow_local.db)")
             _use_sqlite = True
             _init_sqlite_engine()
@@ -391,12 +396,44 @@ def get_pool():
             _pg_pool = pool.ThreadedConnectionPool(1, 10, db_url)
             logger.info("Successfully connected to PostgreSQL database.")
         except Exception as e:
-            logger.warning("PostgreSQL connection unavailable (%s). Falling back to local SQLite engine.", e)
+            if is_prod_or_staging:
+                raise RuntimeError(
+                    f"Production/Staging Database Error: PostgreSQL connection failed in {env} environment: {e}"
+                )
+            logger.warning("PostgreSQL connection unavailable (%s). Falling back to local SQLite engine in dev/test mode.", e)
             _use_sqlite = True
             _init_sqlite_engine()
             return None
 
     return _pg_pool
+
+
+def check_db_health() -> dict:
+    """Check database connectivity and return health report."""
+    pool = get_pool()
+    if _use_sqlite:
+        try:
+            with _sqlite_lock:
+                conn = _create_sqlite_connection()
+                cur = conn.cursor()
+                cur.execute("SELECT 1 AS ok")
+                row = cur.fetchone()
+                conn.close()
+                if row and row["ok"] == 1:
+                    return {"status": "ok", "engine": "sqlite", "fallback": True}
+        except Exception as e:
+            return {"status": "error", "engine": "sqlite", "error": str(e)}
+    elif pool is not None:
+        try:
+            with get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1 AS ok")
+                    row = cur.fetchone()
+                    if row and row["ok"] == 1:
+                        return {"status": "ok", "engine": "postgresql", "fallback": False}
+        except Exception as e:
+            return {"status": "error", "engine": "postgresql", "error": str(e)}
+    return {"status": "error", "error": "Database not initialized"}
 
 
 def _translate_query_for_sqlite(query: str) -> str:
@@ -469,6 +506,48 @@ def execute_transaction(queries_and_params: list[tuple[str, tuple]]) -> None:
                 conn.rollback()
                 logger.error("PostgreSQL transaction failed, rolled back: %s", e)
                 raise
+
+
+def is_sqlite_mode() -> bool:
+    """Return True if currently operating on local SQLite engine."""
+    get_pool()
+    return _use_sqlite
+
+
+@contextmanager
+def transaction_context():
+    """Context manager providing an atomic transactional connection with automatic commit and rollback."""
+    get_pool()
+    if _use_sqlite:
+        with _sqlite_lock:
+            conn = _create_sqlite_connection()
+            try:
+                yield conn
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                logger.error("SQLite transaction failed, rolled back: %s", e)
+                raise
+            finally:
+                conn.close()
+    else:
+        with get_connection() as conn:
+            try:
+                yield conn
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                logger.error("PostgreSQL transaction failed, rolled back: %s", e)
+                raise
+
+
+def execute_cursor(cur, query: str, params: tuple = None):
+    """Execute query adapting parameter syntax for SQLite or Postgres."""
+    if _use_sqlite:
+        translated = _translate_query_for_sqlite(query)
+        cur.execute(translated, params or ())
+    else:
+        cur.execute(query, params or ())
 
 
 def fetch_one(query: str, params: tuple = None) -> dict | None:

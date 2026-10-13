@@ -2,18 +2,38 @@
 @import "tailwindcss";
 
 @theme {
-  --color-green-500: #10b981;
-  --color-green-600: #059669;
-  --color-yellow-500: #f59e0b;
-  --color-yellow-600: #d97706;
-  --color-red-500: #ef4444;
-  --color-red-600: #dc2626;
-  --color-slate-900: #111111;
-  --font-sans: 'Inter', sans-serif;
+  --color-slate-950: #020617;
+  --color-slate-900: #0f172a;
+  --color-slate-800: #1e293b;
+  --color-slate-700: #334155;
+  --color-slate-600: #475569;
+  --color-slate-500: #64748b;
+  --color-slate-300: #cbd5e1;
+  --color-slate-200: #e2e8f0;
+  --color-slate-100: #f1f5f9;
+  --color-slate-50: #f8fafc;
+  
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-indigo-600: #4f46e5;
+  --color-rose-600: #e11d48;
+  --color-rose-700: #be123c;
+  --color-amber-600: #d97706;
+  --color-emerald-600: #059669;
+
+  --color-green-500: #059669;
+  --color-green-600: #047857;
+  --color-yellow-500: #d97706;
+  --color-yellow-600: #b45309;
+  --color-red-500: #e11d48;
+  --color-red-600: #be123c;
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 body {
-  font-family: 'Inter', sans-serif;
-  background-color: #f5f5f7;
-  color: #111111;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #f8fafc;
+  color: #0f172a;
 }
+

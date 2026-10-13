@@ -228,6 +228,81 @@ def test_propose_transfer_idempotency(admin_token):
         assert data["transfer_id"] == "cached-id-123"
 
 
+def test_propose_transfer_payload_conflict_fails(admin_token):
+    """Reusing client_operation_id with different transfer parameters must return HTTP 409 Conflict."""
+    cached_payload = {
+        "transfer_id": "cached-id-123",
+        "from_phc_id": "PHC-001",
+        "to_phc_id": "PHC-002",
+        "item_id": 1,
+        "quantity": 50,
+        "status": "proposed",
+        "client_operation_id": "op-dup-uuid-1",
+    }
+    mock_cached_row = {
+        "operation_id": "op-dup-uuid-1",
+        "response_payload": json.dumps(cached_payload),
+    }
+
+    with patch("app.db.fetch_one", return_value=mock_cached_row):
+        payload = {
+            "from_phc_id": "PHC-001",
+            "to_phc_id": "PHC-003",  # Changed destination facility
+            "item_id": 1,
+            "quantity": 50,
+            "client_operation_id": "op-dup-uuid-1",
+        }
+        res = client.post(
+            "/api/v1/transfers/propose",
+            json=payload,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert res.status_code == 409
+        assert "conflict" in res.json()["detail"].lower()
+
+
+def test_propose_transfer_unsafe_donor_rejected(admin_token):
+    """Proposing transfer from donor whose stock is at or below safety reserve returns 422."""
+    mock_source = {"phc_id": "PHC-001", "facility_name": "PHC One", "district": "District A"}
+    mock_dest = {"phc_id": "PHC-002", "facility_name": "PHC Two", "district": "District A"}
+    mock_med = {"item_id": 1, "name": "Paracetamol", "unit": "tablets", "reorder_level": 50}
+
+    # Donor only has 40 units, but reorder_level (safety reserve) is 50
+    donor_batches = [
+        {"batch_number": "B1", "quantity": 40, "expiry_date": date(2027, 6, 1)}
+    ]
+
+    def mock_fetch(query, params=None):
+        if "processed_operations" in query:
+            return None
+        if "facilities" in query and "PHC-001" in params:
+            return mock_source
+        if "facilities" in query and "PHC-002" in params:
+            return mock_dest
+        if "medicines" in query:
+            return mock_med
+        if "stock_reservations" in query:
+            return {"total": 0}
+        return None
+
+    with patch("app.db.fetch_one", side_effect=mock_fetch), \
+         patch("app.db.fetch_all", return_value=donor_batches):
+        payload = {
+            "from_phc_id": "PHC-001",
+            "to_phc_id": "PHC-002",
+            "item_id": 1,
+            "quantity": 10,
+        }
+        res = client.post(
+            "/api/v1/transfers/propose",
+            json=payload,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert res.status_code == 422
+        assert "reserve constraints" in res.json()["detail"].lower()
+
+
+
 def test_propose_self_transfer_rejected(admin_token):
     """Self transfers (from_phc == to_phc) must return 400."""
     payload = {
@@ -489,7 +564,7 @@ def test_receive_transfer_partial_discrepancy(admin_token):
 
 # ── 3. Stock Movements Endpoint Tests ────────────────────────────────────────
 
-def test_stock_movement_idempotent_deduplication():
+def test_stock_movement_idempotent_deduplication(admin_token):
     """Stock movement endpoint deduplicates requests by client_operation_id."""
     cached_payload = {
         "client_operation_id": "op-pwa-sync-99",
@@ -512,12 +587,62 @@ def test_stock_movement_idempotent_deduplication():
             "movement_type": "dispensed",
             "quantity": 15,
         }
-        res = client.post("/api/v1/stock-movements", json=payload)
+        res = client.post("/api/v1/stock-movements", json=payload, headers={"Authorization": f"Bearer {admin_token}"})
         assert res.status_code == 200
         data = res.json()
         assert data["client_operation_id"] == "op-pwa-sync-99"
         assert data["current_usable_stock"] == 85
         assert data["status"] == "synced"
+
+
+def test_stock_movement_requires_auth():
+    """POST /stock-movements without authentication token must return 401 Unauthorized."""
+    payload = {
+        "client_operation_id": "op-unauth-test-1",
+        "phc_id": "PHC-001",
+        "item_id": 1,
+        "movement_type": "dispensed",
+        "quantity": 10,
+    }
+    res = client.post("/api/v1/stock-movements", json=payload)
+    assert res.status_code == 401
+    assert "authorization" in res.json()["detail"].lower()
+
+
+def test_stock_movement_worker_facility_scope_enforced(admin_token):
+    """Worker assigned to PHC-002 cannot record stock movements for PHC-001."""
+    from app.domain.auth import create_access_token
+    worker_token = create_access_token(
+        user_id=88,
+        username="worker_phc2",
+        email="worker2@phc.local",
+        role="worker",
+    )
+    # Token with payload claims including facility_id
+    import jwt
+    from app.core.config import settings
+    worker_payload = {
+        "sub": "88",
+        "user_id": 88,
+        "username": "worker_phc2",
+        "email": "worker2@phc.local",
+        "role": "worker",
+        "facility_id": "PHC-002",
+        "exp": 9999999999,
+    }
+    scoped_worker_token = jwt.encode(worker_payload, settings.jwt_secret_key, algorithm="HS256")
+    headers = {"Authorization": f"Bearer {scoped_worker_token}"}
+
+    payload = {
+        "client_operation_id": "op-worker-scope-test",
+        "phc_id": "PHC-001",
+        "item_id": 1,
+        "movement_type": "dispensed",
+        "quantity": 5,
+    }
+    res = client.post("/api/v1/stock-movements", json=payload, headers=headers)
+    assert res.status_code == 403
+    assert "restricted to assigned facility" in res.json()["detail"].lower()
 
 
 # ── 4. Alerts Endpoint Tests ─────────────────────────────────────────────────
@@ -546,6 +671,41 @@ def test_list_alerts_endpoint():
         assert len(alerts) >= 1
         assert alerts[0]["severity"] == "critical"
         assert alerts[0]["type"] == "critical_stock"
+        assert "stock_curve" in alerts[0]
+        assert alerts[0]["stock_curve"] is not None
+        assert "forecast_method" in alerts[0]
+
+
+def test_list_alerts_includes_forecast_projection():
+    """Verify alerts endpoint provides forecast-aware depletion projection and dates."""
+    mock_facs = [{"phc_id": "PHC-002", "facility_name": "PHC Two", "district": "District B"}]
+    mock_inv = [
+        {
+            "phc_id": "PHC-002",
+            "item_id": 2,
+            "item_name": "Paracetamol 500mg",
+            "unit": "tablets",
+            "reorder_level": 100,
+            "safety_reserve": 40,
+            "batch_number": "B-PARA-01",
+            "quantity": 30,  # Below safety reserve of 40
+            "expiry_date": date(2027, 6, 1),
+        }
+    ]
+    with patch("app.db.fetch_all", side_effect=[mock_facs, mock_inv, []]):
+        res = client.get("/api/v1/alerts/?phc_id=PHC-002")
+        assert res.status_code == 200
+        alerts = res.json()
+        assert len(alerts) >= 1
+        a = alerts[0]
+        assert a["phc_id"] == "PHC-002"
+        assert a["item_id"] == 2
+        assert a["stock_curve"] is not None
+        assert len(a["stock_curve"]) > 0
+        assert a["forecast_method"] is not None
+        assert a["days_of_supply"] is not None or a["usable_stock"] == 0
+        assert a["projected_reserve_breach_at"] is not None or a["projected_stockout_at"] is not None
+
 
 
 def test_reconcile_transfer_endpoint(manager_token):
@@ -697,7 +857,7 @@ def test_idempotency_payload_mismatch_conflict():
         assert "conflict" in res.json()["detail"].lower()
 
 
-def test_stock_movement_payload_mismatch_conflict():
+def test_stock_movement_payload_mismatch_conflict(admin_token):
     """POST /stock-movements returns HTTP 409 Conflict if same operation ID is submitted with different payload."""
     op_id = "op-mov-conflict-456"
     stored = {
@@ -723,7 +883,7 @@ def test_stock_movement_payload_mismatch_conflict():
             "movement_type": "received",  # Differs from dispensed
             "quantity": 50,
         }
-        res = client.post("/api/v1/stock-movements", json=conflicting_movement)
+        res = client.post("/api/v1/stock-movements", json=conflicting_movement, headers={"Authorization": f"Bearer {admin_token}"})
         assert res.status_code == 409
         assert "conflict" in res.json()["detail"].lower()
 
@@ -802,5 +962,64 @@ def test_alert_explanation_deterministic_fallback():
         assert "data_limitations" in body
         assert len(body["data_limitations"]) > 0
         assert "recommended_action" in body
+
+
+def test_create_facility_auth_enforcement(admin_token):
+    """POST /facility/ requires admin role."""
+    payload = {
+        "name": "New Test PHC",
+        "block": "Block A",
+        "stockItems": [],
+    }
+    # Unauthenticated -> 401
+    res_unauth = client.post("/api/v1/facility/", json=payload)
+    assert res_unauth.status_code == 401
+
+    # Worker -> 403
+    from app.domain.auth import create_access_token
+    worker_token = create_access_token(user_id=11, username="worker1", email="w1@phc.local", role="worker")
+    res_forbidden = client.post("/api/v1/facility/", json=payload, headers={"Authorization": f"Bearer {worker_token}"})
+    assert res_forbidden.status_code == 403
+
+
+def test_facility_beds_attendance_scope_enforcement():
+    """POST /facility/beds and attendance enforce worker facility scope."""
+    from app.domain.auth import create_access_token
+    worker_token = create_access_token(user_id=12, username="worker_phc1", email="w@phc.local", role="worker")
+    # Worker has token but no facility claim or assigned to PHC-001
+    import jwt
+    from app.core.config import settings
+    token_phc1 = jwt.encode(
+        {"user_id": 12, "username": "worker_phc1", "email": "w@phc.local", "role": "worker", "facility_id": "PHC-001", "exp": 9999999999},
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+    headers = {"Authorization": f"Bearer {token_phc1}"}
+
+    # Attempt to update beds for PHC-002 -> 403
+    res_beds = client.post("/api/v1/facility/beds", json={"phc_id": "PHC-002", "available_beds": 5, "timestamp": "2026-10-13T10:00:00Z"}, headers=headers)
+    assert res_beds.status_code == 403
+    assert "restricted to assigned facility" in res_beds.json()["detail"].lower()
+
+    # Attempt to update attendance for PHC-002 -> 403
+    res_att = client.post("/api/v1/facility/attendance", json={"phc_id": "PHC-002", "doctors_present": 2, "timestamp": "2026-10-13T10:00:00Z"}, headers=headers)
+    assert res_att.status_code == 403
+    assert "restricted to assigned facility" in res_att.json()["detail"].lower()
+
+
+def test_replenishment_escalate_role_enforcement():
+    """POST /replenishment/escalate rejects unauthorized roles with 403."""
+    from app.domain.auth import create_access_token
+    worker_token = create_access_token(user_id=13, username="worker_esc", email="w@phc.local", role="worker")
+    payload = {
+        "alert_id": "ALT-001",
+        "phc_id": "PHC-001",
+        "item_id": 1,
+        "required_quantity": 50,
+    }
+    res = client.post("/api/v1/replenishment/escalate", json=payload, headers={"Authorization": f"Bearer {worker_token}"})
+    assert res.status_code == 403
+    assert "forbidden" in res.json()["detail"].lower()
+
 
 

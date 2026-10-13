@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
 from app import db
-from app.domain.auth import get_current_user
+from app.domain.auth import get_current_user, require_roles
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class EscalationResponse(BaseModel):
 )
 async def escalate_shortage(
     payload: EscalationRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_roles(["admin", "manager"])),
 ):
     """
     Log and lodge an emergency depot replenishment request.

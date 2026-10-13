@@ -158,12 +158,13 @@ def run_evaluation_suite(
 
 
 def main() -> None:
+    default_out = Path(__file__).resolve().parents[3] / "evaluation_report.json"
     parser = argparse.ArgumentParser(description="Run Smart Health Sentinel deterministic evaluation suite.")
     parser.add_argument(
         "--output",
         "-o",
         type=str,
-        default="backend/evaluation_report.json",
+        default=str(default_out),
         help="Path to save machine-readable evaluation report JSON.",
     )
     args = parser.parse_args()

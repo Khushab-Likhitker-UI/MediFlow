@@ -9,7 +9,7 @@ import datetime as _dt
 from datetime import date as date_type, datetime, timezone
 from typing import List
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 # ── Inventory ────────────────────────────────────────────────────────────────
@@ -310,12 +310,21 @@ class AlertResponse(BaseModel):
     generated_at: str
     data_source: str = "database"
     status: str = "open"
+    projected_stockout_at: str | None = None
+    projected_reserve_breach_at: str | None = None
+    stock_curve: list[dict] | None = None
+    forecast_method: str | None = None
+    model_version: str | None = None
+    days_of_supply: float | None = None
+    delivery_assumptions: str | None = None
+    donor_candidates: list[dict] | None = None
 
 
 class StockMovementRequest(BaseModel):
     client_operation_id: str = Field(..., description="Stable client UUID")
     phc_id: str = Field(..., description="PHC ID")
-    item_id: int = Field(..., description="Medicine ID")
+    item_id: int | None = Field(default=None, description="Medicine ID")
+    medicine_name: str | None = Field(default=None, description="Medicine name (if item_id unknown)")
     batch_number: str = Field(default="DEFAULT_BATCH")
     movement_type: str = Field(
         ...,
@@ -325,6 +334,12 @@ class StockMovementRequest(BaseModel):
     occurred_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     expiry_date: str | None = Field(default=None, description="ISO format YYYY-MM-DD batch expiry date")
     remarks: str | None = None
+
+    @model_validator(mode="after")
+    def check_item_identifier(self):
+        if self.item_id is None and not self.medicine_name:
+            raise ValueError("Either item_id or medicine_name must be provided.")
+        return self
 
 
 class StockMovementResponse(BaseModel):

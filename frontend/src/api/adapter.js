@@ -48,7 +48,8 @@ export function getApiMode() {
     return currentMemoryApiMode;
   }
   const saved = typeof window !== 'undefined' ? sessionStorage.getItem(STORAGE_KEY) : null;
-  return saved || 'real'; // Defaults to live real backend
+  if (saved === 'mock') return 'mock';
+  return 'real';
 }
 
 export function setApiMode(mode) {

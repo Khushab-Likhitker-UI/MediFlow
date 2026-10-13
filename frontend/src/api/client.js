@@ -101,7 +101,20 @@ export const realApiClient = {
     if (params.severity && params.severity !== 'All') query.set('severity', params.severity);
     if (params.status && params.status !== 'All') query.set('status', params.status);
     const queryString = query.toString() ? `?${query.toString()}` : '';
-    return await request(`/api/v1/alerts/${queryString}`);
+    const raw = await request(`/api/v1/alerts/${queryString}`);
+    if (Array.isArray(raw)) {
+      return raw.map((a, idx) => ({
+        ...a,
+        rank: a.rank || idx + 1,
+        block: a.block || a.district || 'District Block',
+        reserve_stock: a.reserve_stock ?? a.safety_reserve ?? a.reorder_level ?? 50,
+        usable_stock: a.usable_stock ?? a.current_stock ?? 0,
+        hours_until_stockout: a.hours_until_stockout ?? Math.round((a.days_of_supply ?? 1) * 24),
+        plain_language_reason: a.plain_language_reason || a.message,
+        data_source: a.data_source || 'database',
+      }));
+    }
+    return raw;
   },
 
   async fetchAlertDonorCandidates(alertId) {

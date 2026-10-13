@@ -105,18 +105,25 @@ export const syncQueue = async (forceManual = false) => {
         last_attempt_at: new Date().toISOString(),
       });
 
-      let endpoint = ENDPOINTS.inventoryUpdate;
+      let endpoint = ENDPOINTS.stockMovements || ENDPOINTS.inventoryUpdate;
       let payload = {};
 
       if (item.update_type === 'Medicine') {
-        endpoint = ENDPOINTS.inventoryUpdate;
+        endpoint = ENDPOINTS.stockMovements || ENDPOINTS.inventoryUpdate;
         payload = {
           client_operation_id: opId,
           phc_id: item.facility || item.phc_id,
           medicine_name: item.medicine || item.medicine_name,
           quantity: Number(item.quantity),
-          timestamp: item.occurred_at || item.timestamp,
+          batch_number: item.batch_number || 'DEFAULT_BATCH',
+          movement_type: item.movement_type || 'dispensed',
+          occurred_at: item.occurred_at || item.timestamp || new Date().toISOString(),
+          expiry_date: item.expiry_date || null,
+          remarks: item.remarks || null,
         };
+        if (item.item_id) {
+          payload.item_id = Number(item.item_id);
+        }
       } else if (item.update_type === 'Beds') {
         endpoint = ENDPOINTS.facilityBeds;
         payload = {
@@ -134,23 +141,46 @@ export const syncQueue = async (forceManual = false) => {
           timestamp: item.occurred_at || item.timestamp,
         };
       } else {
-        endpoint = ENDPOINTS.inventoryUpdate;
+        endpoint = ENDPOINTS.stockMovements || ENDPOINTS.inventoryUpdate;
         payload = {
           client_operation_id: opId,
           phc_id: item.facility || item.phc_id,
           medicine_name: item.medicine || item.medicine_name,
           quantity: Number(item.quantity),
-          timestamp: item.occurred_at || item.timestamp,
+          batch_number: item.batch_number || 'DEFAULT_BATCH',
+          movement_type: item.movement_type || 'dispensed',
+          occurred_at: item.occurred_at || item.timestamp || new Date().toISOString(),
         };
+      }
+
+      // Attach auth token if available in localStorage
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-Client-Operation-Id': opId,
+      };
+      try {
+        let token = null;
+        if (typeof localStorage !== 'undefined') {
+          token = localStorage.getItem('access_token') || localStorage.getItem('token');
+          if (!token) {
+            const savedUser = localStorage.getItem('kraft_user') || localStorage.getItem('user');
+            if (savedUser) {
+              const u = JSON.parse(savedUser);
+              token = u.token || u.access_token;
+            }
+          }
+        }
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+      } catch {
+        // Ignore localStorage retrieval issues in sandbox environments
       }
 
       try {
         const response = await fetchWithTimeout(endpoint, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Client-Operation-Id': opId,
-          },
+          headers,
           body: JSON.stringify(payload),
         });
 
@@ -168,6 +198,16 @@ export const syncQueue = async (forceManual = false) => {
 
           // Update last successful sync timestamp
           await setMeta('last_successful_sync_time', new Date().toISOString());
+        } else if (response.status === 401 || response.status === 403) {
+          // Authentication or permission required: preserve in outbox, pause processing
+          const errorMsg = await extractErrorMessage(response);
+          await markOperationNeedsCorrection(
+            opId,
+            `Authentication / permission required (${response.status}): ${errorMsg}`,
+            response.status
+          );
+          // Pause queue processing so unauthenticated requests are not lost
+          break;
         } else if (response.status >= 400 && response.status < 500) {
           // Client or Validation Error (400, 404, 409, 422)
           // MUST NEVER silently delete. Transition to needs_correction so user can see & resolve

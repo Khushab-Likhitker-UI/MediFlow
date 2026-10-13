@@ -59,15 +59,15 @@ class Settings(BaseModel):
     gemini_api_key: str | None = os.getenv("GEMINI_API_KEY")
 
     def model_post_init(self, __context):
-        # Production safeguard: fail fast if critical secrets are missing or defaults
-        if self.environment == "production":
+        # Production & Staging safeguard: fail fast if critical secrets are missing or defaults
+        if self.environment in ("production", "staging"):
             if not self.database_url:
                 raise RuntimeError(
-                    "Security / Startup Error: DATABASE_URL must be configured when ENVIRONMENT=production."
+                    f"Security / Startup Error: DATABASE_URL must be configured when ENVIRONMENT={self.environment}."
                 )
             if self.jwt_secret_key == "smarthealth-sentinel-dev-secret-key-32chars-min":
                 raise RuntimeError(
-                    "Security / Startup Error: JWT_SECRET_KEY must be overridden with a strong secret in production."
+                    f"Security / Startup Error: JWT_SECRET_KEY must be overridden with a strong secret in {self.environment}."
                 )
 
 

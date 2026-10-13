@@ -175,12 +175,12 @@ export const AlertDetailAndDonorReview = ({
 
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-neutral-400 uppercase font-mono">User Clearance:</span>
-          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded font-mono ${
+          <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded font-mono ${
             user?.role === 'admin'
-              ? 'bg-purple-950 text-purple-300 border border-purple-500'
+              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
               : user?.role === 'manager'
-              ? 'bg-blue-950 text-blue-300 border border-blue-500'
-              : 'bg-neutral-800 text-neutral-400'
+              ? 'bg-blue-50 text-blue-700 border border-blue-200'
+              : 'bg-slate-100 text-slate-600 border border-slate-200'
           }`}>
             {user?.role || 'viewer'} ({user?.username || 'Guest'})
           </span>

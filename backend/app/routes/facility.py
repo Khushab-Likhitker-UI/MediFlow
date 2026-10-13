@@ -8,10 +8,11 @@ All operations verify that the referenced PHC exists before writing.
 """
 
 import logging
-
-from fastapi import APIRouter, HTTPException
+from datetime import date, timedelta
+from fastapi import APIRouter, Depends, HTTPException
 
 import time
+from app.domain.auth import get_current_user, require_roles, verify_facility_access
 from app.models.schemas import BedsUpdate, AttendanceUpdate, FacilityCreate
 from app import db
 
@@ -124,7 +125,10 @@ async def list_facilities():
     summary="Register a new PHC facility in Supabase",
     response_description="Created facility summary",
 )
-async def create_facility(facility_in: FacilityCreate):
+async def create_facility(
+    facility_in: FacilityCreate,
+    current_user: dict = Depends(require_roles(["admin"])),
+):
     """Create a new Primary Health Centre in Supabase with initial beds & inventory."""
     phc_id = f"PHC-{int(time.time() * 1000) % 1000000:06d}"
     try:
@@ -150,6 +154,7 @@ async def create_facility(facility_in: FacilityCreate):
             (phc_id,)
         )
         # Insert stock items
+        default_expiry = (date.today() + timedelta(days=365)).isoformat()
         for item in facility_in.stockItems:
             m = db.fetch_one("SELECT item_id FROM medicines WHERE LOWER(name) = LOWER(%s)", (item.itemName.strip(),))
             if not m:
@@ -162,9 +167,9 @@ async def create_facility(facility_in: FacilityCreate):
                 db.execute_query(
                     """
                     INSERT INTO inventory (phc_id, item_id, batch_number, quantity, expiry_date)
-                    VALUES (%s, %s, 'INITIAL-BATCH', %s, CURRENT_DATE + INTERVAL '1 year')
+                    VALUES (%s, %s, 'INITIAL-BATCH', %s, %s)
                     """,
-                    (phc_id, item_id, item.currentUnits)
+                    (phc_id, item_id, item.currentUnits, default_expiry)
                 )
                 if item.avgDailyConsumption > 0:
                     db.execute_query(
@@ -185,11 +190,15 @@ async def create_facility(facility_in: FacilityCreate):
     summary="Log a beds availability update for a PHC",
     response_description="Acknowledgement that the update was received",
 )
-async def update_beds(update: BedsUpdate):
+async def update_beds(
+    update: BedsUpdate,
+    current_user: dict = Depends(get_current_user),
+):
     """UPSERT available beds count for a PHC.
 
     Returns 400 if the PHC ID does not exist in the facilities table.
     """
+    verify_facility_access(current_user, update.phc_id)
     _verify_phc_exists(update.phc_id)
 
     query = """
@@ -221,11 +230,15 @@ async def update_beds(update: BedsUpdate):
     summary="Log a doctor attendance update for a PHC",
     response_description="Acknowledgement that the update was received",
 )
-async def update_attendance(update: AttendanceUpdate):
+async def update_attendance(
+    update: AttendanceUpdate,
+    current_user: dict = Depends(get_current_user),
+):
     """UPSERT daily doctor attendance summary for a PHC.
 
     Returns 400 if the PHC ID does not exist in the facilities table.
     """
+    verify_facility_access(current_user, update.phc_id)
     _verify_phc_exists(update.phc_id)
 
     attendance_date = update.timestamp.date()

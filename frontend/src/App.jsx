@@ -200,19 +200,19 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] flex flex-col md:flex-row font-sans text-neutral-900">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-900">
       {/* Sidebar Navigation */}
-      <aside className="w-full md:w-72 bg-[#111111] flex flex-col z-20 sticky top-0 md:h-screen text-white justify-between shadow-2xl">
+      <aside className="w-full md:w-72 bg-slate-900 border-r border-slate-800 flex flex-col z-20 sticky top-0 md:h-screen text-white justify-between shadow-xl">
         <div>
           {/* Logo Header */}
-          <div className="p-8 pb-6 flex flex-col items-center justify-center text-center mt-2 border-b border-neutral-800/80">
-            <div className="w-14 h-14 border-2 border-white flex items-center justify-center mb-5 transform rotate-45 shadow-[0_0_20px_rgba(255,255,255,0.15)]">
-              <div className="transform -rotate-45 font-black tracking-[0.2em] text-xs">KRAFT</div>
+          <div className="p-8 pb-6 flex flex-col items-center justify-center text-center mt-2 border-b border-slate-800">
+            <div className="w-12 h-12 border-2 border-slate-400 flex items-center justify-center mb-4 transform rotate-45 shadow-sm">
+              <div className="transform -rotate-45 font-black tracking-[0.2em] text-[10px] text-white">MED</div>
             </div>
-            <h1 className="text-xs font-black tracking-[0.25em] text-white uppercase">
+            <h1 className="text-xs font-bold tracking-[0.25em] text-white uppercase">
               District Sentinel
             </h1>
-            <p className="text-[9px] text-neutral-400 mt-1 uppercase tracking-[0.3em] font-mono">
+            <p className="text-[9px] text-slate-400 mt-1 uppercase tracking-[0.25em] font-mono">
               Medical Triage Operations
             </p>
           </div>
@@ -224,42 +224,42 @@ function App() {
                 setActiveTab('command');
                 setSelectedAlert(null);
               }}
-              className={`flex items-center justify-start gap-3.5 px-4 py-3 text-xs font-bold uppercase tracking-[0.15em] transition-all rounded cursor-pointer ${
+              className={`flex items-center justify-start gap-3.5 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] transition-all rounded cursor-pointer ${
                 activeTab === 'command'
-                  ? 'bg-neutral-800 text-white border-l-4 border-red-500 shadow-md'
-                  : 'text-neutral-400 hover:text-white hover:bg-neutral-900/60 border-l-4 border-transparent'
+                  ? 'bg-slate-800 text-white border-l-4 border-rose-500 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border-l-4 border-transparent'
               }`}
             >
-              <AlertOctagon className="h-4 w-4 shrink-0 text-red-500" />
+              <AlertOctagon className="h-4 w-4 shrink-0 text-rose-400" />
               <span>1. Command Center</span>
             </button>
 
             <button
               onClick={() => setActiveTab('transfers')}
-              className={`flex items-center justify-start gap-3.5 px-4 py-3 text-xs font-bold uppercase tracking-[0.15em] transition-all rounded cursor-pointer ${
+              className={`flex items-center justify-start gap-3.5 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] transition-all rounded cursor-pointer ${
                 activeTab === 'transfers'
-                  ? 'bg-neutral-800 text-white border-l-4 border-cyan-400 shadow-md'
-                  : 'text-neutral-400 hover:text-white hover:bg-neutral-900/60 border-l-4 border-transparent'
+                  ? 'bg-slate-800 text-white border-l-4 border-blue-500 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border-l-4 border-transparent'
               }`}
             >
-              <Truck className="h-4 w-4 shrink-0 text-cyan-400" />
+              <Truck className="h-4 w-4 shrink-0 text-blue-400" />
               <span>2. Transfer Tracking</span>
             </button>
 
             <button
               onClick={() => setActiveTab('evaluation')}
-              className={`flex items-center justify-start gap-3.5 px-4 py-3 text-xs font-bold uppercase tracking-[0.15em] transition-all rounded cursor-pointer ${
+              className={`flex items-center justify-start gap-3.5 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] transition-all rounded cursor-pointer ${
                 activeTab === 'evaluation'
-                  ? 'bg-neutral-800 text-white border-l-4 border-purple-400 shadow-md'
-                  : 'text-neutral-400 hover:text-white hover:bg-neutral-900/60 border-l-4 border-transparent'
+                  ? 'bg-slate-800 text-white border-l-4 border-indigo-500 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border-l-4 border-transparent'
               }`}
             >
-              <FlaskConical className="h-4 w-4 shrink-0 text-purple-400" />
+              <FlaskConical className="h-4 w-4 shrink-0 text-indigo-400" />
               <span>3. Model Evaluation</span>
             </button>
 
-            <div className="my-2 border-t border-neutral-800/80 px-4 pt-2">
-              <span className="text-[9px] font-mono uppercase tracking-widest text-neutral-500">
+            <div className="my-2 border-t border-slate-800 px-4 pt-2">
+              <span className="text-[9px] font-mono uppercase tracking-widest text-slate-500">
                 District Registry
               </span>
             </div>
@@ -268,11 +268,11 @@ function App() {
               onClick={() => setActiveTab('overview')}
               className={`flex items-center justify-start gap-3.5 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.12em] transition-all rounded cursor-pointer ${
                 activeTab === 'overview'
-                  ? 'bg-neutral-800 text-white border-l-4 border-white'
-                  : 'text-neutral-400 hover:text-white hover:bg-neutral-900/40 border-l-4 border-transparent'
+                  ? 'bg-slate-800 text-white border-l-4 border-slate-300'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/40 border-l-4 border-transparent'
               }`}
             >
-              <Activity className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+              <Activity className="h-3.5 w-3.5 shrink-0 text-slate-400" />
               <span>Facility Grid</span>
             </button>
 
@@ -280,28 +280,28 @@ function App() {
               onClick={() => setActiveTab('redistribution')}
               className={`flex items-center justify-start gap-3.5 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.12em] transition-all rounded cursor-pointer ${
                 activeTab === 'redistribution'
-                  ? 'bg-neutral-800 text-white border-l-4 border-white'
-                  : 'text-neutral-400 hover:text-white hover:bg-neutral-900/40 border-l-4 border-transparent'
+                  ? 'bg-slate-800 text-white border-l-4 border-slate-300'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/40 border-l-4 border-transparent'
               }`}
             >
-              <GitMerge className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+              <GitMerge className="h-3.5 w-3.5 shrink-0 text-slate-400" />
               <span>Sankey Flow</span>
             </button>
           </nav>
         </div>
 
         {/* Bottom Drawer: Environment, Dev Switcher & Officer Profile */}
-        <div className="p-5 border-t border-neutral-800/80 bg-[#0c0c0c] flex flex-col gap-3">
+        <div className="p-5 border-t border-slate-800 bg-slate-950 flex flex-col gap-3">
           {/* API Mode Indicator & Switcher */}
-          <div className="bg-neutral-900 border border-neutral-800 p-2.5 rounded text-[10px] space-y-2">
+          <div className="bg-slate-900 border border-slate-800 p-2.5 rounded text-[10px] space-y-2">
             <div className="flex items-center justify-between font-mono">
-              <span className="text-neutral-400 uppercase">API Adapter:</span>
+              <span className="text-slate-400 uppercase">API Adapter:</span>
               {apiMode === 'real' ? (
                 <span className="text-emerald-400 font-bold flex items-center gap-1">
-                  <Database className="w-3 h-3" /> Real API
+                  <Database className="w-3 h-3" /> Live Backend
                 </span>
               ) : (
-                <span className="text-amber-400 font-bold flex items-center gap-1">
+                <span className="text-amber-400 font-medium flex items-center gap-1">
                   <FlaskConical className="w-3 h-3" /> Dev Adapter
                 </span>
               )}
@@ -309,14 +309,14 @@ function App() {
 
             {/* Development Only Switcher */}
             {!api.isProduction && (
-              <div className="flex items-center gap-1 pt-1 border-t border-neutral-800">
+              <div className="flex items-center gap-1 pt-1 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => handleToggleApiMode('mock')}
-                  className={`flex-1 py-1 px-1.5 text-[9px] font-bold rounded uppercase cursor-pointer transition-colors ${
+                  className={`flex-1 py-1 px-1.5 text-[9px] font-semibold rounded uppercase cursor-pointer transition-colors ${
                     apiMode === 'mock'
-                      ? 'bg-amber-500 text-black shadow-xs'
-                      : 'bg-neutral-800 text-neutral-400 hover:text-white'
+                      ? 'bg-slate-700 text-white'
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
                   }`}
                   title="Switch to simulated Phase 1 fixtures"
                 >
@@ -325,10 +325,10 @@ function App() {
                 <button
                   type="button"
                   onClick={() => handleToggleApiMode('real')}
-                  className={`flex-1 py-1 px-1.5 text-[9px] font-bold rounded uppercase cursor-pointer transition-colors ${
+                  className={`flex-1 py-1 px-1.5 text-[9px] font-semibold rounded uppercase cursor-pointer transition-colors ${
                     apiMode === 'real'
-                      ? 'bg-emerald-500 text-black shadow-xs'
-                      : 'bg-neutral-800 text-neutral-400 hover:text-white'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
                   }`}
                   title="Connect to live backend"
                 >
@@ -339,10 +339,10 @@ function App() {
           </div>
 
           {/* Role Clearance & Dev Switcher */}
-          <div className="bg-neutral-900/60 p-2.5 rounded border border-neutral-800/80 text-[10px] flex items-center justify-between">
+          <div className="bg-slate-900/80 p-2.5 rounded border border-slate-800 text-[10px] flex items-center justify-between">
             <div className="flex items-center gap-2 overflow-hidden">
-              <div className="w-7 h-7 rounded bg-neutral-800 border border-neutral-700 flex items-center justify-center shrink-0">
-                <Shield className="w-3.5 h-3.5 text-neutral-300" />
+              <div className="w-7 h-7 rounded bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
+                <Shield className="w-3.5 h-3.5 text-slate-300" />
               </div>
               <div className="overflow-hidden">
                 <div className="font-bold text-white truncate text-xs">{user.username}</div>

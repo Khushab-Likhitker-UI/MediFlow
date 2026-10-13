@@ -1,8 +1,8 @@
 # Smart Health Sentinel — Scientific Evaluation & Forecasting Methodology
 
 > **Evaluation Run ID:** `eval-run-2da1ccfd9dc5`  
-> **Evaluator Source:** [`backend/run_evaluation.py`](file:///c:/Users/likhi/Desktop/sehatsetu/MediFlow/backend/run_evaluation.py) / [`backend/app/ml/evaluation/evaluator.py`](file:///c:/Users/likhi/Desktop/sehatsetu/MediFlow/backend/app/ml/evaluation/evaluator.py)  
-> **Report Artifact:** [`backend/evaluation_report.json`](file:///c:/Users/likhi/Desktop/sehatsetu/MediFlow/backend/evaluation_report.json)  
+> **Evaluator Source:** [`backend/run_evaluation.py`](file:///c:/Users/likhi/Desktop/Medicine_Helper/MediFlow/backend/run_evaluation.py) / [`backend/app/ml/evaluation/evaluator.py`](file:///c:/Users/likhi/Desktop/Medicine_Helper/MediFlow/backend/app/ml/evaluation/evaluator.py)  
+> **Report Artifact:** [`backend/evaluation_report.json`](file:///c:/Users/likhi/Desktop/Medicine_Helper/MediFlow/backend/evaluation_report.json)  
 > **Data Provenance:** Deterministic Synthetic Test Fixtures (Strictly labeled; not real-world field data)
 
 ---

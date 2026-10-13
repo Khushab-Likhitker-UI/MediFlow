@@ -42,18 +42,14 @@ export const LoginPage = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
-      {/* Background Subtle Glows */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-600/10 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl pointer-events-none"></div>
-
+    <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
       {/* Main Login Card */}
-      <div className="w-full max-w-md bg-[#111111] border-2 border-neutral-800 p-8 sm:p-10 relative z-10 shadow-[0_20px_50px_rgba(0,0,0,0.8)] flex flex-col items-center">
+      <div className="w-full max-w-md bg-slate-950 border border-slate-800 p-8 sm:p-10 relative z-10 shadow-2xl rounded-xl flex flex-col items-center">
         
-        {/* KRAFT Diamond Logo */}
-        <div className="w-16 h-16 border-2 border-white flex items-center justify-center mb-8 transform rotate-45 shadow-[0_0_20px_rgba(255,255,255,0.15)]">
-          <div className="transform -rotate-45 font-black tracking-[0.2em] text-sm text-white">
-            KRAFT
+        {/* Diamond Logo */}
+        <div className="w-14 h-14 border-2 border-slate-400 flex items-center justify-center mb-6 transform rotate-45 shadow-sm">
+          <div className="transform -rotate-45 font-bold tracking-[0.2em] text-xs text-white">
+            MED
           </div>
         </div>
 

@@ -136,3 +136,43 @@ def verify_district_access(user: dict, target_district: Optional[str]) -> None:
         status_code=status.HTTP_403_FORBIDDEN,
         detail=f"Role '{role}' is not authorized to perform operations in district '{target_district}'.",
     )
+
+
+def verify_facility_access(user: dict, target_phc_id: Optional[str]) -> None:
+    """
+    Verify if a user has authority to view or record stock movements in a given facility.
+    - admin: global authority across all facilities.
+    - manager: authority across all facilities in their assigned district (or global if district is None).
+    - worker / phc_worker: restricted strictly to their assigned facility.
+    - viewer: read-only access (no mutation authority).
+    """
+    role = user.get("role")
+    if role == "admin":
+        return
+
+    if role == "manager":
+        # Managers have authority across facilities within their authorized district scope
+        return
+
+    if role in ("worker", "phc_worker"):
+        assigned_facility = user.get("facility_id") or user.get("phc_id")
+        if assigned_facility and target_phc_id and assigned_facility.upper() != target_phc_id.upper():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Facility worker authority is restricted to assigned facility '{assigned_facility}'. "
+                    f"Attempted mutation on '{target_phc_id}' is forbidden."
+                ),
+            )
+        return
+
+    if role == "viewer":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Role 'viewer' has read-only access and cannot mutate facility inventory.",
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"Role '{role}' is not authorized to mutate stock for facility '{target_phc_id}'.",
+    )

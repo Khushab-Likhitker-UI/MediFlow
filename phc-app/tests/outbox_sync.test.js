@@ -295,4 +295,29 @@ describe('PHC PWA — Offline Outbox & Exact-Once Idempotency Suite', () => {
     expect(synced.length).toBe(1);
     expect(needsCorrection.length).toBe(1);
   });
+
+  it('15. HTTP 401/403 retains operation in outbox and marks needs_correction with auth explanation', async () => {
+    const op = await enqueueOperation({
+      facility: 'PHC-001',
+      medicine: 'Paracetamol',
+      quantity: 15,
+      update_type: 'Medicine',
+    });
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ detail: 'Missing Authorization header with Bearer token.' }),
+    });
+
+    const res = await syncQueue(true);
+    expect(res.syncedCount).toBe(0);
+
+    const items = await getAllSyncItems();
+    expect(items.length).toBe(1);
+    expect(items[0].sync_state).toBe('needs_correction');
+    expect(items[0].error_message).toContain('Authentication');
+  });
 });

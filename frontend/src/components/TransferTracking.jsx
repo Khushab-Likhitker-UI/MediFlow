@@ -124,18 +124,18 @@ export const TransferTracking = ({
   return (
     <div className="flex flex-col gap-6 w-full pb-16">
       {/* Title & Stats */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b-2 border-neutral-800">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-slate-200">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-pulse"></span>
-            <span className="text-[10px] font-mono tracking-[0.25em] text-neutral-400 uppercase">
+            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+            <span className="text-[10px] font-mono tracking-[0.2em] text-slate-500 uppercase">
               Chain of Custody &amp; Verification
             </span>
           </div>
-          <h2 className="text-2xl font-black uppercase tracking-[0.1em] text-slate-900">
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900">
             Transfer Tracking &amp; Audit Timeline
           </h2>
-          <p className="text-xs text-neutral-500 uppercase tracking-wider mt-1">
+          <p className="text-xs text-slate-500 mt-0.5">
             Lifecycle Management: Proposed &rarr; Approved &rarr; Dispatched &rarr; Received &rarr; Reconciled
           </p>
         </div>
@@ -143,7 +143,7 @@ export const TransferTracking = ({
         <button
           onClick={onRefresh}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-[#111] hover:bg-black text-white text-xs font-bold uppercase tracking-wider rounded transition-all cursor-pointer shadow-sm disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold uppercase tracking-wider rounded-md transition-all cursor-pointer shadow-sm disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           <span>Refresh Ledger</span>
@@ -151,9 +151,9 @@ export const TransferTracking = ({
       </div>
 
       {/* Critical Verification Notice Banner */}
-      <div className="p-3 bg-neutral-900 text-neutral-300 border-l-4 border-cyan-400 text-xs rounded-r flex items-center justify-between">
+      <div className="p-3 bg-slate-100 text-slate-700 border border-slate-200 text-xs rounded-md flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <Shield className="w-4 h-4 text-cyan-400 shrink-0" />
+          <Shield className="w-4 h-4 text-blue-600 shrink-0" />
           <span>
             <strong>Protocol Constraint:</strong> Approved transfers remain in state <code>APPROVED</code> (Pending Dispatch). They are <strong>never</strong> marked completed until verified physical receipt and ledger reconciliation.
           </span>

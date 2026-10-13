@@ -11,6 +11,7 @@ export const API_BASE_URL = (
 );
 
 export const ENDPOINTS = {
+  stockMovements: `${API_BASE_URL}/api/v1/stock-movements`,
   inventoryUpdate: `${API_BASE_URL}/api/v1/inventory/update`,
   facilityList: `${API_BASE_URL}/api/v1/facility/`,
   inventoryCatalogue: `${API_BASE_URL}/api/v1/inventory/`,

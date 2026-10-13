@@ -98,7 +98,7 @@ app.include_router(shortage_router, prefix="/api")
 
 
 
-# ── Root health check ───────────────────────────────────────────────────────
+# ── Root and System Health Checks ──────────────────────────────────────────
 
 @app.get("/", tags=["Health"])
 async def root():
@@ -108,6 +108,28 @@ async def root():
         "status": "running",
         "docs": "/docs",
     }
+
+
+@app.get("/health", tags=["Health"])
+@app.get("/api/v1/health", tags=["Health"])
+async def health_check():
+    from app.db import check_db_health
+    from fastapi.responses import JSONResponse
+    
+    db_report = check_db_health()
+    is_healthy = db_report.get("status") == "ok"
+    
+    content = {
+        "service": settings.app_name,
+        "version": settings.app_version,
+        "environment": settings.environment,
+        "status": "healthy" if is_healthy else "unhealthy",
+        "database": db_report,
+    }
+    
+    if not is_healthy and settings.environment in ("production", "staging"):
+        return JSONResponse(status_code=503, content=content)
+    return content
 
 
 if __name__ == "__main__":

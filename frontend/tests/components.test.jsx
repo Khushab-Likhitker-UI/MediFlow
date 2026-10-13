@@ -69,7 +69,7 @@ describe('UI Badge & Non-Color-Only Accessibility Tests', () => {
 
   it('renders data source provenance labels', () => {
     const dbHtml = renderToString(<DataSourceBadge source="database" />);
-    assert.ok(dbHtml.includes('SUPABASE_DB'));
+    assert.ok(dbHtml.includes('DATABASE'));
 
     const mlHtml = renderToString(<DataSourceBadge source="synthetic" />);
     assert.ok(mlHtml.includes('ML_SYNTHETIC'));

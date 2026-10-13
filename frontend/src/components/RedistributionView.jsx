@@ -25,7 +25,12 @@ export const RedistributionView = ({ phcs }) => {
     <div className="flex flex-col h-full min-h-[calc(100vh-8rem)]">
       <div className="flex justify-between items-end mb-8 border-b-2 border-[#111] pb-4">
         <div>
-          <h2 className="text-xl font-bold tracking-[0.1em] text-[#111] uppercase">Actionable Transfers</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold tracking-[0.1em] text-[#111] uppercase">Actionable Transfers</h2>
+            <span className="text-[10px] font-semibold uppercase px-2 py-0.5 bg-gray-100 text-gray-600 border border-gray-300 rounded">
+              Preview (Authoritative in Command Center)
+            </span>
+          </div>
           <p className="text-xs text-gray-500 mt-1 uppercase tracking-wider font-medium">Recommended routing to prevent stock-outs</p>
         </div>
         
